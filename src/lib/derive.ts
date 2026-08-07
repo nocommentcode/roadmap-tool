@@ -8,7 +8,7 @@ const branchStem = (b: string) => b.replace(/^[^/]+\//, '');
 
 /**
  * PROTOTYPE join, exact on the brief stem. The real tool records the branch on the
- * stage when /next-stage creates the worktree, so none of this guessing is needed.
+ * stage when /roadmap-next-stage creates the worktree, so none of this guessing is needed.
  *
  * Deliberately NOT fuzzy: token-overlap matching once claimed a multi-stage
  * re-landing PR for an unrelated stage and reported two unbuilt stages as landed.
@@ -128,7 +128,7 @@ export function derive(fx: Fixture) {
       if (s.pr?.state === 'MERGED' && !s.pr.landedOnMaster)
         reasons.push({
           kind: 'bad',
-          text: `merge commit ${s.pr.mergeCommit?.slice(0, 7)} is NOT in master's history — re-landed elsewhere?`,
+          text: `merge commit ${s.pr.mergeCommit?.slice(0, 7)} is NOT in the trunk's history — re-landed elsewhere?`,
         });
       if (s.pr?.state === 'MERGED' && !s.checked)
         reasons.push({ kind: 'warn', text: 'ROADMAP.md checkbox still unticked' });
@@ -141,7 +141,7 @@ export function derive(fx: Fixture) {
           reasons.push({ kind: 'warn', text: `CI ${s.pr.checksPassed}/${s.pr.checksTotal}` });
         if (!s.pr.humanReviewCount)
           reasons.push({ kind: 'info', text: 'no human review yet' });
-        if (s.pr.behindMaster) reasons.push({ kind: 'info', text: `behind master by ${s.pr.behindMaster}` });
+        if (s.pr.behindMaster) reasons.push({ kind: 'info', text: `behind trunk by ${s.pr.behindMaster}` });
       } else {
         reasons.push({ kind: 'info', text: 'worktree open, no PR yet' });
       }
@@ -279,7 +279,7 @@ export function preambleFor(v: StageView, fx: Fixture): string {
   ]);
   const deps = v.dependsOn.length ? v.dependsOn.join(', ') : 'none';
   return [
-    `/next-stage ${fx.roadmap.slug} ${v.num}`,
+    `/roadmap-next-stage ${fx.roadmap.slug} ${v.num}`,
     ``,
     `Brief: docs/roadmaps/${fx.roadmap.slug}/${v.briefFile}`,
     `Depends on: ${deps}. Base: ${

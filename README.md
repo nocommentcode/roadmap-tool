@@ -82,25 +82,31 @@ has a flag:
 }
 ```
 
-## The roadmap format
+## The skills — install these
 
-The tool reads a documented format, described by two Claude Code skills it ships.
-They are **not installed automatically** — installing a CLI shouldn't rewrite your
-Claude config. Opt in:
+The tool ships two Claude Code skills, and **it does not work properly without them.**
+They are what write the format it reads, and the *Start this phase* button hands its
+generated preamble straight to `/roadmap-next-stage`. Without them installed, a launched
+session opens with `Unknown command: /roadmap-next-stage` and no idea what it is meant
+to do.
 
 ```bash
 roadmap-tool --install-skills
 ```
 
-That symlinks them into `~/.claude/skills` (and refuses to touch anything it didn't
-create). The tool prints a one-line reminder on startup if they're missing.
+Not automatic: installing a CLI shouldn't rewrite your Claude config behind your back.
+It symlinks into `~/.claude/skills`, refuses to touch anything it didn't create, and the
+tool prints a reminder on startup while they're missing.
 
-- **`roadmap-format`** — ROADMAP.md structure, brief frontmatter, the decision index,
+Both names are prefixed `roadmap-` so they don't collide with a `/next-stage` you may
+already have.
+
+- **`/roadmap-format`** — ROADMAP.md structure, brief frontmatter, the decision index,
   the `Roadmap-Stage:` PR trailer, splitting, and a maintenance/audit reference
-- **`next-stage`** — starting a stage: pick the ref, re-ground the brief, create the
-  worktree on the right base, open the draft PR with its trailer
+- **`/roadmap-next-stage`** — starting a stage: pick the ref, re-ground the brief, create
+  the worktree on the right base, open the draft PR with its trailer
 
-The short version:
+## The roadmap format, in short
 
 ```markdown
 ---

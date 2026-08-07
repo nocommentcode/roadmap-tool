@@ -222,7 +222,7 @@ structural change.**
 - [splitting.md](references/splitting.md) — splitting a stage across branches
 - [maintenance.md](references/maintenance.md) — propagation rules and the audit
 - [pr-body.md](references/pr-body.md) — the full PR body format
-- [next-stage](../next-stage/SKILL.md) — starting a stage in this format
-- [next-stage/stacking](../next-stage/references/stacking.md) — stacked stage PRs
+- [roadmap-next-stage](../roadmap-next-stage/SKILL.md) — starting a stage in this format
+- [roadmap-next-stage/stacking](../roadmap-next-stage/references/stacking.md) — stacked stage PRs
 - `roadmap.config.json` — the tool's fallback dependency map, for roadmaps not yet
   carrying frontmatter. Every brief migrated is one entry deleted; the goal is an empty map.

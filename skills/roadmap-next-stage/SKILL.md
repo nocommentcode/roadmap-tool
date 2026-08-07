@@ -1,5 +1,5 @@
 ---
-name: next-stage
+name: roadmap-next-stage
 description: Start the next stage of a roadmap — resolve where the roadmap is newest, re-ground the brief against the current codebase, create a worktree on the right base (fresh or stacked), and open a draft PR carrying the stage trailer. Use when the user wants to start, pick up, or begin a roadmap stage, says "next stage", or names a stage to work on.
 ---
 
