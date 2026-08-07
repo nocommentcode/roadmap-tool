@@ -27,6 +27,8 @@ Options
       --terminal <bin>     Terminal emulator to launch sessions in.
                            Default: the first one found.
       --no-open            Don't open a browser on start.
+      --install-skills     Symlink this package's Claude Code skills into
+                           ~/.claude/skills, then exit. Not done automatically.
   -h, --help               This.
 
 Environment
@@ -54,6 +56,7 @@ export function parseArgs(argv) {
     const a = argv[i];
     if (a === '-h' || a === '--help') return { help: true };
     if (a === '--no-open') { out.open = false; continue; }
+    if (a === '--install-skills') continue; // handled before config resolution
     const key = FLAGS[a.split('=')[0]];
     if (!key) {
       if (a.startsWith('-')) return { error: `unknown option: ${a}` };

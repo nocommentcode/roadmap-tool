@@ -84,8 +84,16 @@ has a flag:
 
 ## The roadmap format
 
-The tool reads a documented format. Both skills are installed into `~/.claude/skills`
-on `npm install` (or `npm run install-skills`):
+The tool reads a documented format, described by two Claude Code skills it ships.
+They are **not installed automatically** — installing a CLI shouldn't rewrite your
+Claude config. Opt in:
+
+```bash
+roadmap-tool --install-skills
+```
+
+That symlinks them into `~/.claude/skills` (and refuses to touch anything it didn't
+create). The tool prints a one-line reminder on startup if they're missing.
 
 - **`roadmap-format`** — ROADMAP.md structure, brief frontmatter, the decision index,
   the `Roadmap-Stage:` PR trailer, splitting, and a maintenance/audit reference

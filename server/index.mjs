@@ -15,10 +15,19 @@ import { RoadmapState } from './state.mjs';
 import { launch, openEditor } from './launch.mjs';
 import { log } from './util.mjs';
 import { resolveConfig, USAGE } from './config.mjs';
+import { installSkills, missingSkills } from '../scripts/install-skills.mjs';
 
 const ROOT = path.join(import.meta.dirname, '..');
 
-const config = await resolveConfig(process.argv.slice(2));
+const argv = process.argv.slice(2);
+
+if (argv.includes('--install-skills')) {
+  console.log('Linking skills into ~/.claude/skills:');
+  installSkills();
+  process.exit(0);
+}
+
+const config = await resolveConfig(argv.filter((a) => a !== '--install-skills'));
 if (config.help) { console.log(USAGE); process.exit(0); }
 if (config.error) { console.error(`\n  ${config.error}\n`); process.exit(1); }
 const PORT = config.port;
@@ -118,6 +127,9 @@ server.listen(PORT, '127.0.0.1', () => {
   log(`roadmap-tool → http://127.0.0.1:${PORT}`);
   log(`  ${config.repo} · ${config.slug} · trunk ${config.trunk} · branches ${config.handle}/<stage>`);
   if (config.roadmaps.length > 1) log(`  other roadmaps here: ${config.roadmaps.filter((r) => r !== config.slug).join(', ')}`);
+  // mention the skills once, rather than installing them behind your back
+  const missing = missingSkills();
+  if (missing.length) log(`  skills not installed (${missing.join(', ')}) — run: roadmap-tool --install-skills`);
 });
 
 state.start().then(() => {

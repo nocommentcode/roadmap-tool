@@ -8,8 +8,7 @@
     "prepare": "vite build",
     "snapshot": "node scripts/snapshot.mjs",
     "typecheck": "tsc --noEmit",
-    "install-skills": "node scripts/install-skills.mjs",
-    "postinstall": "node scripts/install-skills.mjs || true"
+    "install-skills": "node scripts/install-skills.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",
