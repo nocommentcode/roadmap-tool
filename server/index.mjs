@@ -15,7 +15,7 @@ import { RoadmapState } from './state.mjs';
 import { launch, openEditor } from './launch.mjs';
 import { log } from './util.mjs';
 import { resolveConfig, USAGE } from './config.mjs';
-import { installSkills, missingSkills, WHY } from './skills.mjs';
+import { installSkills, uninstallSkills, missingSkills, WHY } from './skills.mjs';
 
 const ROOT = path.join(import.meta.dirname, '..');
 
@@ -27,7 +27,13 @@ if (argv.includes('--install-skills')) {
   process.exit(0);
 }
 
-const config = await resolveConfig(argv.filter((a) => a !== '--install-skills'));
+if (argv.includes('--uninstall-skills')) {
+  console.log('Removing skill links from ~/.claude/skills:');
+  uninstallSkills();
+  process.exit(0);
+}
+
+const config = await resolveConfig(argv.filter((a) => !a.endsWith('-skills')));
 if (config.help) { console.log(USAGE); process.exit(0); }
 if (config.error) { console.error(`\n  ${config.error}\n`); process.exit(1); }
 const PORT = config.port;
@@ -142,9 +148,19 @@ state.start().then(() => {
       `${s?.sessions.length ?? 0} sessions · ${s?.liveSessions.length ?? 0} live`);
 });
 
-for (const sig of ['SIGINT', 'SIGTERM']) {
-  process.on(sig, () => {
-    state.stop();
-    server.close(() => process.exit(0));
-  });
+// `server.close()` alone waits for open connections to drain, and an SSE stream never
+// drains — an open browser tab would hang Ctrl+C forever. Hang up on the streams first,
+// then force any remaining sockets, then give it a moment before exiting regardless.
+let shuttingDown = false;
+function shutdown() {
+  if (shuttingDown) process.exit(0); // second Ctrl+C = don't wait
+  shuttingDown = true;
+  state.stop();
+  for (const res of clients) res.end();
+  clients.clear();
+  server.closeAllConnections?.();
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 500).unref();
 }
+
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, shutdown);

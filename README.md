@@ -98,6 +98,8 @@ Not automatic: installing a CLI shouldn't rewrite your Claude config behind your
 It symlinks into `~/.claude/skills`, refuses to touch anything it didn't create, and the
 tool prints a reminder on startup while they're missing.
 
+Undo with `roadmap-tool --uninstall-skills` — it removes only links it created.
+
 Both names are prefixed `roadmap-` so they don't collide with a `/next-stage` you may
 already have.
 
@@ -140,6 +142,23 @@ something needs changing it launches a session with the context to change it.
   history is flagged, not counted.
 - **Finds sessions across worktrees.** `claude --resume` is scoped to one directory;
   this isn't.
+
+## Uninstalling
+
+```bash
+roadmap-tool --uninstall-skills      # first: remove the ~/.claude/skills links
+npm uninstall -g roadmap-tool        # if you installed globally
+```
+
+If you ran it with `npx`, there is nothing to uninstall — but the download stays in
+npm's cache, and any skill links point *into* that cache. Remove the links first, then:
+
+```bash
+npm cache clean --force              # clears the whole npm cache, npx entries included
+```
+
+Order matters: uninstall the skills **before** removing the package, or the links are
+left dangling and `--uninstall-skills` can no longer identify them as its own.
 
 ## Development
 

@@ -29,6 +29,8 @@ Options
       --no-open            Don't open a browser on start.
       --install-skills     Symlink this package's Claude Code skills into
                            ~/.claude/skills, then exit. Not done automatically.
+      --uninstall-skills   Remove those links again. Only ever removes links it
+                           created itself.
   -h, --help               This.
 
 Environment
@@ -56,7 +58,7 @@ export function parseArgs(argv) {
     const a = argv[i];
     if (a === '-h' || a === '--help') return { help: true };
     if (a === '--no-open') { out.open = false; continue; }
-    if (a === '--install-skills') continue; // handled before config resolution
+    if (a === '--install-skills' || a === '--uninstall-skills') continue; // handled earlier
     const key = FLAGS[a.split('=')[0]];
     if (!key) {
       if (a.startsWith('-')) return { error: `unknown option: ${a}` };

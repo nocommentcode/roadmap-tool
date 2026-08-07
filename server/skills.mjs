@@ -42,6 +42,25 @@ Without them a launched session opens with "Unknown command:
 to guessing which PR belongs to which stage.
 `;
 
+/** Remove only the links we created — never anything we didn't. */
+export function uninstallSkills({ log = console.log } = {}) {
+  let changed = 0;
+  for (const name of skillNames()) {
+    const target = path.join(SRC, name);
+    const link = path.join(DEST, name);
+    const stat = fs.lstatSync(link, { throwIfNoEntry: false });
+    if (!stat) { log(`  absent    ${name}`); continue; }
+    if (!stat.isSymbolicLink() || fs.readlinkSync(link) !== target) {
+      log(`  kept      ${name} — not a link we created`);
+      continue;
+    }
+    fs.unlinkSync(link);
+    log(`  removed   ${name}`);
+    changed++;
+  }
+  return changed;
+}
+
 export function installSkills({ log = console.log } = {}) {
   fs.mkdirSync(DEST, { recursive: true });
   let changed = 0;
