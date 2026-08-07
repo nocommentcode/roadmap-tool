@@ -1,0 +1,54 @@
+{
+  "name": "roadmap-tool",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "start": "npm run build && node server/index.mjs",
+    "build": "vite build",
+    "snapshot": "node scripts/snapshot.mjs",
+    "typecheck": "tsc --noEmit",
+    "install-skills": "node scripts/install-skills.mjs",
+    "postinstall": "node scripts/install-skills.mjs || true"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.0"
+  },
+  "bin": {
+    "roadmap-tool": "server/index.mjs"
+  },
+  "files": [
+    "server",
+    "skills",
+    "scripts",
+    "dist",
+    "README.md"
+  ],
+  "version": "0.1.0",
+  "description": "See where a multi-stage roadmap actually is \u2014 stage status, PRs, and the Claude session attached to each.",
+  "license": "MIT",
+  "author": "nocommentcode",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nocommentcode/roadmap-tool.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "roadmap",
+    "claude-code",
+    "git-worktree",
+    "stacked-prs",
+    "planning"
+  ]
+}

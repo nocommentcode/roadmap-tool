@@ -1,0 +1,16 @@
+{
+  "_": "Optional. Lives in the repo being read, not next to the tool. Every field has a CLI flag; delete anything you don't need.",
+
+  "slug": "espresso",
+  "trunk": "main",
+  "handle": "you",
+  "worktreesDir": "/home/you/worktrees",
+
+  "_dependsOn": "Fallback dependency graph for roadmaps whose briefs have no `depends_on:` frontmatter yet. Keyed by BRIEF STEM, never by stage number — numbers shift when a stage is split. Every brief migrated is one entry deleted.",
+  "dependsOn": {
+    "scaffold": [],
+    "storage": ["scaffold"]
+  },
+
+  "poll": { "git": 5000, "github": 60000 }
+}
