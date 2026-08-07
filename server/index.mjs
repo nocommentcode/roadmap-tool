@@ -15,14 +15,14 @@ import { RoadmapState } from './state.mjs';
 import { launch, openEditor } from './launch.mjs';
 import { log } from './util.mjs';
 import { resolveConfig, USAGE } from './config.mjs';
-import { installSkills, missingSkills } from '../scripts/install-skills.mjs';
+import { installSkills, missingSkills, WHY } from './skills.mjs';
 
 const ROOT = path.join(import.meta.dirname, '..');
 
 const argv = process.argv.slice(2);
 
 if (argv.includes('--install-skills')) {
-  console.log('Linking skills into ~/.claude/skills:');
+  console.log(WHY);
   installSkills();
   process.exit(0);
 }
@@ -129,7 +129,11 @@ server.listen(PORT, '127.0.0.1', () => {
   if (config.roadmaps.length > 1) log(`  other roadmaps here: ${config.roadmaps.filter((r) => r !== config.slug).join(', ')}`);
   // mention the skills once, rather than installing them behind your back
   const missing = missingSkills();
-  if (missing.length) log(`  skills not installed (${missing.join(', ')}) — run: roadmap-tool --install-skills`);
+  if (missing.length) {
+    log(`  ⚠ skills not installed: ${missing.join(', ')}`);
+    log(`    "Start this phase" will launch a session that cannot run /roadmap-next-stage.`);
+    log(`    Fix with: roadmap-tool --install-skills`);
+  }
 });
 
 state.start().then(() => {
