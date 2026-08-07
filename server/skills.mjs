@@ -42,20 +42,29 @@ Without them a launched session opens with "Unknown command:
 to guessing which PR belongs to which stage.
 `;
 
+/**
+ * A link is ours if it points at a `skills/<name>` directory belonging to *any* copy of
+ * this package — not just this one. Links are commonly created by a dev clone and
+ * removed by a global install (or vice versa), and an exact-path check would refuse to
+ * clean those up, which is precisely when you need it to.
+ */
+function isOurLink(link, name) {
+  const stat = fs.lstatSync(link, { throwIfNoEntry: false });
+  if (!stat?.isSymbolicLink()) return false;
+  const target = fs.readlinkSync(link);
+  return path.basename(target) === name && path.basename(path.dirname(target)) === 'skills';
+}
+
 /** Remove only the links we created — never anything we didn't. */
 export function uninstallSkills({ log = console.log } = {}) {
   let changed = 0;
   for (const name of skillNames()) {
-    const target = path.join(SRC, name);
     const link = path.join(DEST, name);
-    const stat = fs.lstatSync(link, { throwIfNoEntry: false });
-    if (!stat) { log(`  absent    ${name}`); continue; }
-    if (!stat.isSymbolicLink() || fs.readlinkSync(link) !== target) {
-      log(`  kept      ${name} — not a link we created`);
-      continue;
-    }
+    if (!fs.lstatSync(link, { throwIfNoEntry: false })) { log(`  absent    ${name}`); continue; }
+    if (!isOurLink(link, name)) { log(`  kept      ${name} — not a link we created`); continue; }
+    const target = fs.readlinkSync(link);
     fs.unlinkSync(link);
-    log(`  removed   ${name}`);
+    log(`  removed   ${name}  (was → ${target})`);
     changed++;
   }
   return changed;

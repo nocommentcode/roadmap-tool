@@ -145,20 +145,25 @@ something needs changing it launches a session with the context to change it.
 
 ## Uninstalling
 
-```bash
-roadmap-tool --uninstall-skills      # first: remove the ~/.claude/skills links
-npm uninstall -g roadmap-tool        # if you installed globally
-```
-
-If you ran it with `npx`, there is nothing to uninstall — but the download stays in
-npm's cache, and any skill links point *into* that cache. Remove the links first, then:
+`roadmap-tool` is only on your `PATH` if you installed it globally. Otherwise use
+whichever copy you have:
 
 ```bash
-npm cache clean --force              # clears the whole npm cache, npx entries included
+roadmap-tool --uninstall-skills                        # global install
+npx github:nocommentcode/roadmap-tool --uninstall-skills   # npx
+node /path/to/roadmap-tool/server/index.mjs --uninstall-skills   # a clone
 ```
 
-Order matters: uninstall the skills **before** removing the package, or the links are
-left dangling and `--uninstall-skills` can no longer identify them as its own.
+Then remove the package itself:
+
+```bash
+npm uninstall -g roadmap-tool        # global
+npm cache clean --force              # npx — clears the whole npm cache
+rm -rf /path/to/roadmap-tool         # a clone
+```
+
+Do the skills **first**. Remove the package and the links are left dangling, pointing at
+a path that no longer exists.
 
 ## Development
 
