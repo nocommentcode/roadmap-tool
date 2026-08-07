@@ -127,6 +127,24 @@ const server = http.createServer(async (req, res) => {
   fs.createReadStream(file).pipe(res);
 });
 
+/**
+ * How to re-invoke this same copy. `roadmap-tool` is only on PATH after a global
+ * install — under npx it exists just for the length of that one command, and from a
+ * clone it never exists — so telling everyone to run `roadmap-tool …` is wrong for
+ * two of the three ways people actually run this.
+ */
+function selfCommand(args) {
+  const entry = process.argv[1] ?? '';
+  if (entry.includes('/_npx/')) return `npx github:nocommentcode/roadmap-tool ${args}`;
+  if (entry.includes(`${path.sep}node_modules${path.sep}`) || path.basename(entry) === 'roadmap-tool') {
+    // a global install puts the shim on PATH; a local one does not
+    return process.env.npm_config_global || !entry.includes('node_modules')
+      ? `roadmap-tool ${args}`
+      : `${entry} ${args}`;
+  }
+  return `node ${entry} ${args}`;
+}
+
 // Listen first, load second: the page opens immediately and fills in over SSE as each
 // source lands, rather than staring at a dead port for the length of a `gh` call.
 server.listen(PORT, '127.0.0.1', () => {
@@ -138,7 +156,7 @@ server.listen(PORT, '127.0.0.1', () => {
   if (missing.length) {
     log(`  ⚠ skills not installed: ${missing.join(', ')}`);
     log(`    "Start this phase" will launch a session that cannot run /roadmap-next-stage.`);
-    log(`    Fix with: roadmap-tool --install-skills`);
+    log(`    Fix with: ${selfCommand('--install-skills')}`);
   }
 });
 

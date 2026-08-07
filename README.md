@@ -82,23 +82,22 @@ has a flag:
 }
 ```
 
-## The skills — install these
+## The skills
 
-The tool ships two Claude Code skills, and **it does not work properly without them.**
-They are what write the format it reads, and the *Start this phase* button hands its
-generated preamble straight to `/roadmap-next-stage`. Without them installed, a launched
-session opens with `Unknown command: /roadmap-next-stage` and no idea what it is meant
-to do.
+The tool ships two Claude Code skills and **does not work properly without them** —
+*Start this phase* hands its generated preamble to `/roadmap-next-stage`, and the format
+they define is what the tool reads. So **installing the package installs them**, into
+`~/.claude/skills`, as a `postinstall` step. Restart Claude Code to pick them up.
+
+It only ever creates links it can later remove, and refuses to touch anything it didn't
+create. To undo: `roadmap-tool --uninstall-skills`.
+
+The one exception is `npx`, which fetches into a cache npm may prune later — linking into
+that would leave broken links behind. Those runs print the command instead:
 
 ```bash
-roadmap-tool --install-skills
+npx github:nocommentcode/roadmap-tool --install-skills
 ```
-
-Not automatic: installing a CLI shouldn't rewrite your Claude config behind your back.
-It symlinks into `~/.claude/skills`, refuses to touch anything it didn't create, and the
-tool prints a reminder on startup while they're missing.
-
-Undo with `roadmap-tool --uninstall-skills` — it removes only links it created.
 
 Both names are prefixed `roadmap-` so they don't collide with a `/next-stage` you may
 already have.
