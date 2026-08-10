@@ -24,10 +24,30 @@ async function lastTouched(repo, ref, slug) {
 }
 
 /**
- * @returns [{ ref, kind, label, sublabel, ahead, pr, worktreePath, when, subject }]
- *          ordered like a stack: trunk at the bottom, furthest ahead at the top.
+ * Every commit that has ever touched this roadmap, newest first. Any of them can be
+ * loaded — `git show <sha>:<path>` needs nothing special — which makes the roadmap's
+ * whole history browsable rather than just its live versions.
  */
-export async function listRoadmapRefs({ repo, slug, trunk }, { head, prs = [], worktrees = [] }) {
+async function history({ repo, slug, trunk }, limit) {
+  const out = await sh(
+    'git',
+    ['log', `--max-count=${limit}`, '--format=%H%x09%cI%x09%s', `origin/${trunk}`, '--', `docs/roadmaps/${slug}/`],
+    repo,
+  );
+  return out
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const [oid, when, subject = ''] = line.split('\t');
+      return { oid, when, subject, pr: Number(subject.match(/#(\d+)/)?.[1]) || null };
+    });
+}
+
+/**
+ * @returns [{ ref, kind, label, sublabel, ahead, pr, worktreePath, when, subject }]
+ *          ordered like a stack: history at the bottom, furthest ahead at the top.
+ */
+export async function listRoadmapRefs({ repo, slug, trunk }, { head, prs = [], worktrees = [], historyLimit = 40 }) {
   const out = [];
 
   // the trunk — what has actually landed
@@ -86,12 +106,30 @@ export async function listRoadmapRefs({ repo, slug, trunk }, { head, prs = [], w
 
   out.sort((a, b) => a.ahead - b.ahead);
 
-  // the union of all of the above
+  // Everything before the current trunk tip. The newest entry is the trunk itself, so
+  // it is dropped rather than listed twice.
+  const past = (await history({ repo, slug, trunk }, historyLimit + 1)).slice(1);
+  for (const h of past) {
+    out.unshift({
+      ref: h.oid,
+      kind: 'history',
+      label: h.oid.slice(0, 8),
+      sublabel: h.subject.length > 64 ? `${h.subject.slice(0, 63)}…` : h.subject,
+      ahead: -1,
+      pr: h.pr,
+      worktreePath: null,
+      when: h.when,
+      subject: h.subject,
+    });
+  }
+
+  // the union of the trunk and everything live — never the past
+  const liveCount = out.filter((r) => r.kind !== 'history').length;
   out.push({
     ref: MERGED,
     kind: 'merged',
     label: 'Merged view',
-    sublabel: `${out.length} version${out.length === 1 ? '' : 's'} combined`,
+    sublabel: `${liveCount} live version${liveCount === 1 ? '' : 's'} combined`,
     ahead: Number.MAX_SAFE_INTEGER,
     pr: null,
     worktreePath: null,

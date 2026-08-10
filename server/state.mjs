@@ -119,6 +119,7 @@ export class RoadmapState extends EventEmitter {
             head: this.parts.head,
             prs: this.parts.github?.prs ?? [],
             worktrees: this.parts.git?.worktrees ?? [],
+            historyLimit: this.config.historyLimit ?? 40,
           });
 
           // A pinned version is read alone. That is the point: the merged view unions

@@ -147,7 +147,7 @@ export type Fixture = {
   /** every version of the roadmap that exists right now */
   availableRefs: {
     ref: string;
-    kind: 'trunk' | 'branch' | 'worktree' | 'merged';
+    kind: 'trunk' | 'branch' | 'worktree' | 'merged' | 'history';
     label: string;
     sublabel: string;
     ahead: number;

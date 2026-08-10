@@ -192,9 +192,16 @@ function VersionRail({
   onPickRef: (ref: string) => void;
   onPickRoadmap: (slug: string) => void;
 }) {
-  const refs = [...(fx.availableRefs ?? [])].reverse(); // newest first
+  const all = [...(fx.availableRefs ?? [])].reverse(); // newest first
   const active = fx.pinnedRef ?? ':merged';
   const roadmaps = fx.roadmaps ?? [fx.roadmap.slug];
+
+  // Live versions always; the roadmap's whole history behind a toggle, because there can
+  // be dozens of them and they are not what you are usually looking for.
+  const live = all.filter((r) => r.kind !== 'history');
+  const past = all.filter((r) => r.kind === 'history');
+  const [showPast, setShowPast] = useState(past.some((r) => r.ref === active));
+  const refs = live;
 
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 overflow-y-auto border-r border-zinc-900 px-4 py-12 lg:block">
@@ -221,42 +228,68 @@ function VersionRail({
         {/* the spine */}
         <div className="absolute bottom-2 left-[5px] top-2 w-px bg-zinc-900" />
 
-        {refs.map((r) => {
-          const on = r.ref === active;
-          const tone =
-            r.kind === 'merged' ? 'text-zinc-300'
-            : r.kind === 'worktree' ? 'text-amber-300'
-            : r.kind === 'branch' ? 'text-violet-300'
-            : 'text-zinc-400';
-          return (
+        {refs.map((r) => (
+          <RefDot key={r.ref} r={r} on={r.ref === active} onPick={onPickRef} />
+        ))}
+
+        {past.length > 0 && (
+          <>
             <button
-              key={r.ref}
-              onClick={() => onPickRef(r.ref)}
-              title={r.subject ?? undefined}
-              className="group relative block w-full cursor-pointer py-2 pl-6 pr-1 text-left"
+              onClick={() => setShowPast((x) => !x)}
+              className="relative block w-full cursor-pointer py-2 pl-6 pr-1 text-left text-[11px] text-zinc-600 hover:text-zinc-400"
             >
-              <span
-                className={`absolute left-0 top-[13px] size-[11px] rounded-full border-2 ${
-                  on
-                    ? 'border-zinc-100 bg-zinc-100'
-                    : 'border-zinc-700 bg-zinc-950 group-hover:border-zinc-500'
-                }`}
-              />
-              <span className={`block truncate text-[13px] font-semibold ${on ? 'text-zinc-50' : tone}`}>
-                {r.label}
-              </span>
-              <span className="mt-0.5 block truncate text-[11px] text-zinc-600">{r.sublabel}</span>
-              {r.when && <span className="block text-[11px] text-zinc-700">{ago(r.when)}</span>}
+              <span className="absolute left-[3px] top-[15px] size-[5px] rounded-full bg-zinc-800" />
+              {showPast ? 'hide' : 'show'} {past.length} earlier version{past.length === 1 ? '' : 's'}
             </button>
-          );
-        })}
+            {showPast &&
+              past.map((r) => (
+                <RefDot key={r.ref} r={r} on={r.ref === active} onPick={onPickRef} />
+              ))}
+          </>
+        )}
       </div>
 
       <p className="mt-6 border-t border-zinc-900 pt-4 text-[11px] leading-relaxed text-zinc-600">
-        The merged view unions every version, so it shows stages a branch has{' '}
+        The merged view unions the live versions, so it shows stages a branch has{' '}
         <em>removed</em> as well as added. Pick a single version to see it exactly.
       </p>
     </aside>
+  );
+}
+
+/** One entry on the timeline. */
+function RefDot({
+  r, on, onPick,
+}: {
+  r: Fixture['availableRefs'][number];
+  on: boolean;
+  onPick: (ref: string) => void;
+}) {
+  const past = r.kind === 'history';
+  const tone =
+    r.kind === 'merged' ? 'text-zinc-300'
+    : r.kind === 'worktree' ? 'text-amber-300'
+    : r.kind === 'branch' ? 'text-violet-300'
+    : past ? 'mono text-zinc-500'
+    : 'text-zinc-400';
+  return (
+    <button
+      onClick={() => onPick(r.ref)}
+      title={r.subject ?? undefined}
+      className="group relative block w-full cursor-pointer py-2 pl-6 pr-1 text-left"
+    >
+      <span
+        className={`absolute left-0 rounded-full border-2 ${
+          past ? 'left-[2px] top-[15px] size-[7px]' : 'top-[13px] size-[11px]'
+        } ${on ? 'border-zinc-100 bg-zinc-100' : 'border-zinc-700 bg-zinc-950 group-hover:border-zinc-500'}`}
+      />
+      <span className={`flex items-baseline gap-1.5 text-[13px] font-semibold ${on ? 'text-zinc-50' : tone}`}>
+        <span className="truncate">{r.label}</span>
+        {r.pr && <span className="shrink-0 text-[11px] font-normal text-violet-400/70">#{r.pr}</span>}
+      </span>
+      <span className="mt-0.5 block truncate text-[11px] text-zinc-600">{r.sublabel}</span>
+      {r.when && <span className="block text-[11px] text-zinc-700">{ago(r.when)}</span>}
+    </button>
   );
 }
 
