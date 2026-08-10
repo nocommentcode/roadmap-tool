@@ -67,6 +67,17 @@ async function readAt(repo, ref, rel, trunk) {
  */
 export const stemOf = (briefFile) => briefFile.replace(/\.md$/, '').replace(/^\d+[a-z]*-/i, '');
 
+/**
+ * Just the stage keys at a ref — the checklist, without reading any briefs. Used to mark
+ * which stages a branch has that the trunk doesn't, without merging the two.
+ */
+export async function readStageKeys({ repo, slug, trunk = 'master' }, ref = trunk) {
+  const md = await readAt(repo, ref, `docs/roadmaps/${slug}/ROADMAP.md`, trunk);
+  return new Set(
+    [...md.matchAll(/^- \[[ x]\]\s*\d+[a-z]*:.*?—\s*\[brief\]\((.+?)\)/gm)].map((m) => stemOf(m[1])),
+  );
+}
+
 export async function readRoadmap({ repo, slug, dependsOn = {}, trunk = 'master' }, ref = trunk) {
   const rel = (f) => `docs/roadmaps/${slug}/${f}`;
   const md = await readAt(repo, ref, rel('ROADMAP.md'), trunk);
@@ -111,9 +122,13 @@ export async function readRoadmap({ repo, slug, dependsOn = {}, trunk = 'master'
     });
   });
 
-  // dependsOn is authored in stems; the UI shows numbers
+  // dependsOn and supersedes are authored in stems; the UI shows numbers
   const numOf = new Map(stages.map((s) => [s.key, s.num]));
-  for (const s of stages) s.dependsOnNums = s.dependsOn.map((k) => numOf.get(k) ?? k);
+  for (const s of stages) {
+    s.dependsOnNums = s.dependsOn.map((k) => numOf.get(k) ?? k);
+    // a superseded stage is usually absent from this ref, so its number often won't resolve
+    s.supersedesNums = s.supersedes.map((k) => numOf.get(k) ?? '');
+  }
 
   // a discovered-but-unscheduled stage, recorded in prose rather than the checklist
   const found = md.split(/^##\s+Found while building[^\n]*$/m)[1];

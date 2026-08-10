@@ -37,7 +37,7 @@ export function useRoadmapState() {
 
   const refresh = () => void fetch('/api/refresh', { method: 'POST' });
 
-  /** Pick which version of the roadmap to show. ':merged' for the union. */
+  /** Pick which version of the roadmap to show. Empty string = auto (the newest). */
   const setRef = (ref: string) =>
     void fetch('/api/ref', {
       method: 'POST',

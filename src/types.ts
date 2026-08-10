@@ -22,9 +22,7 @@ export type Stage = {
   /** stages this one replaces (a split declares both halves) */
   supersedes: string[];
   supersedesNums: string[];
-  /** which refs describe this stage */
-  onRefs: string[];
-  /** null when master has it; otherwise the branch proposing it */
+  /** set when viewing a branch: this stage isn't on the trunk yet */
   proposedOn: string | null;
   briefLastTouched: string;
   touches: string[];
@@ -147,7 +145,7 @@ export type Fixture = {
   /** every version of the roadmap that exists right now */
   availableRefs: {
     ref: string;
-    kind: 'trunk' | 'branch' | 'worktree' | 'merged' | 'history';
+    kind: 'trunk' | 'branch' | 'worktree' | 'history';
     label: string;
     sublabel: string;
     ahead: number;

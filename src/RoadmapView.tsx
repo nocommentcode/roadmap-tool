@@ -193,7 +193,8 @@ function VersionRail({
   onPickRoadmap: (slug: string) => void;
 }) {
   const all = [...(fx.availableRefs ?? [])].reverse(); // newest first
-  const active = fx.pinnedRef ?? ':merged';
+  // nothing pinned means the server auto-picked the newest live version
+  const active = fx.pinnedRef ?? fx.roadmap.ref;
   const roadmaps = fx.roadmaps ?? [fx.roadmap.slug];
 
   // Live versions always; the roadmap's whole history behind a toggle, because there can
@@ -250,8 +251,8 @@ function VersionRail({
       </div>
 
       <p className="mt-6 border-t border-zinc-900 pt-4 text-[11px] leading-relaxed text-zinc-600">
-        The merged view unions the live versions, so it shows stages a branch has{' '}
-        <em>removed</em> as well as added. Pick a single version to see it exactly.
+        One version at a time, exactly as it is — nothing is combined. Without a choice,
+        the newest live version is shown.
       </p>
     </aside>
   );
@@ -267,8 +268,7 @@ function RefDot({
 }) {
   const past = r.kind === 'history';
   const tone =
-    r.kind === 'merged' ? 'text-zinc-300'
-    : r.kind === 'worktree' ? 'text-amber-300'
+    r.kind === 'worktree' ? 'text-amber-300'
     : r.kind === 'branch' ? 'text-violet-300'
     : past ? 'mono text-zinc-500'
     : 'text-zinc-400';

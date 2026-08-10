@@ -10,7 +10,6 @@
 import path from 'node:path';
 import { sh } from './util.mjs';
 
-export const MERGED = ':merged';
 export const WORKTREE_PREFIX = 'worktree:';
 
 /** `worktree:/abs/path` → `/abs/path` */
@@ -122,20 +121,6 @@ export async function listRoadmapRefs({ repo, slug, trunk }, { head, prs = [], w
       subject: h.subject,
     });
   }
-
-  // the union of the trunk and everything live — never the past
-  const liveCount = out.filter((r) => r.kind !== 'history').length;
-  out.push({
-    ref: MERGED,
-    kind: 'merged',
-    label: 'Merged view',
-    sublabel: `${liveCount} live version${liveCount === 1 ? '' : 's'} combined`,
-    ahead: Number.MAX_SAFE_INTEGER,
-    pr: null,
-    worktreePath: null,
-    when: null,
-    subject: null,
-  });
 
   return out;
 }

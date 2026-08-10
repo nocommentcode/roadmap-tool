@@ -12,9 +12,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
-import { readRoadmap, readDecisionDrift, WORKTREE_PREFIX } from './sources/roadmap.mjs';
-import { listRoadmapRefs, MERGED } from './refs.mjs';
-import { mergeRoadmaps } from './merge.mjs';
+import { readRoadmap, readDecisionDrift, readStageKeys } from './sources/roadmap.mjs';
+import { listRoadmapRefs } from './refs.mjs';
 import { readGit, resolveRoadmapHead, fetchTrunk } from './sources/git.mjs';
 import { readGithub } from './sources/github.mjs';
 import { readSessions, SESSIONS_DIR } from './sources/claude.mjs';
@@ -122,40 +121,24 @@ export class RoadmapState extends EventEmitter {
             historyLimit: this.config.historyLimit ?? 40,
           });
 
-          // A pinned version is read alone. That is the point: the merged view unions
-          // everything and so cannot represent a stage a branch DELETED, unless its
-          // replacement declares `supersedes:`.
-          if (this.pinnedRef && this.pinnedRef !== MERGED) {
-            this.parts.roadmap = await readRoadmap(this.config, this.pinnedRef);
-            this.parts.roadmap.ref = this.pinnedRef;
-            this.parts.roadmap.refs = [this.pinnedRef];
-            break;
-          }
-          // Read master AND every live branch: a stage can split itself on its own
-          // branch, so no single ref describes the whole roadmap.
-          const head = this.parts.head;
+          // ONE version, always — never a union. A merge of several refs is a union, and
+          // a union cannot express a stage a branch DELETED, so it shows work that no
+          // longer exists. Default to the newest live version; the UI can pin any other.
           const trunk = this.config.trunk;
-          const refs = [...new Set([head?.ref, ...(head?.candidates ?? []).map((c) => c.branch)])]
-            .filter((r) => r && r !== trunk);
-          const [base, ...rest] = await Promise.all([
-            readRoadmap(this.config, trunk).catch(() => null),
-            ...refs.map((ref) =>
-              readRoadmap(this.config, ref).then((roadmap) => ({ ref, roadmap })).catch(() => null),
-            ),
-          ]);
-          const overlays = rest.filter(Boolean).map((o) => ({
-            ...o,
-            depth: head?.candidates?.find((c) => c.branch === o.ref)?.ahead ?? 0,
-          }));
+          const ref = this.pinnedRef ?? this.parts.head?.ref ?? trunk;
+          const roadmap = await readRoadmap(this.config, ref);
+          roadmap.ref = ref;
+          roadmap.refs = [ref];
 
-          // Uncommitted edits, in any worktree, as the deepest overlays — you should
-          // see a roadmap you are part-way through editing.
-          for (const r of this.parts.refs.filter((x) => x.kind === 'worktree')) {
-            const wt = await readRoadmap(this.config, r.ref).catch(() => null);
-            if (wt) overlays.push({ ref: r.ref, roadmap: wt, depth: Number.MAX_SAFE_INTEGER });
+          // Which of these stages the trunk doesn't have yet — a comparison, not a merge.
+          if (ref !== trunk) {
+            const onTrunk = await readStageKeys(this.config, trunk).catch(() => null);
+            for (const st of roadmap.stages) st.proposedOn = onTrunk && !onTrunk.has(st.key) ? ref : null;
+          } else {
+            for (const st of roadmap.stages) st.proposedOn = null;
           }
-          this.parts.roadmap = mergeRoadmaps(base, overlays, trunk);
-          this.parts.roadmap.ref = head?.ref ?? trunk;
+
+          this.parts.roadmap = roadmap;
           break;
         }
         case 'github':
