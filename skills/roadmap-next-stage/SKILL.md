@@ -62,18 +62,48 @@ silently followed is worse than one openly rewritten.
 Branch name is `<handle>/<stage-key>` — the key from frontmatter, so `brew-log` gets
 `you/brew-log`. This is what links the worktree to the stage before a PR exists.
 
-**Fresh** when every dependency is merged:
+### Which base?
+
+Not "the previous stage" — the base comes from **this stage's own `depends_on:`**, and
+only from the ones that haven't landed. A stage may depend on nothing near it in the
+numbering, or on something three stages back.
+
+Count the dependencies whose PR is **open and ready for review** (a draft doesn't count —
+its shape is still moving, so stacking on it means rebasing onto a moving target):
+
+**None → branch off the trunk.** Everything it needs has landed.
 
 ```bash
 git worktree add ../<repo>-worktrees/<stage-key> -b <handle>/<stage-key> origin/<trunk>
 ```
 
-**Stacked** when a dependency's PR is open but unmerged — branch on it, not on the trunk:
+**Exactly one → stack on that branch.**
 
 ```bash
-git worktree add ../<repo>-worktrees/<stage-key> -b <handle>/<stage-key> <predecessor-branch>
-gh stack init <predecessor-branch> <handle>/<stage-key>
+git worktree add ../<repo>-worktrees/<stage-key> -b <handle>/<stage-key> <dep-branch>
+gh stack init <dep-branch> <handle>/<stage-key>
 ```
+
+**More than one → you cannot branch off two commits, so decide deliberately.** First check
+whether they are already one stack:
+
+```bash
+git merge-base --is-ancestor <dep-a> <dep-b>   # exit 0 ⇒ b already contains a
+```
+
+- **One contains the others** — stack on the **topmost** (the descendant). It already has
+  everything, and you get one clean chain rather than a fork.
+- **They diverge** — no base gives you both. In preference order:
+  1. **Wait** for one to merge, then stack on the other. Usually the right answer.
+  2. **Land the smaller one first** if it's close, then you're in the single-dep case.
+  3. **Stack on the one you need most** and note in the PR that the other is missing — only
+     if you can genuinely build against a subset. Say so explicitly; don't leave it implied.
+
+  Do **not** merge the two dependency branches together to make a base. That drags one
+  stage's unreviewed work into another stage's PR and makes both unreviewable.
+
+If you have to choose, say which you chose and why in the PR body. The next person reading
+the stack needs to know it was a decision rather than an accident.
 
 **Stacking is how a roadmap moves faster than its review latency** — without it every
 stage waits for the one below to merge. [stacking.md](references/stacking.md) covers

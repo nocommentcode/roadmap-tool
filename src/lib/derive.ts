@@ -193,6 +193,12 @@ export function derive(fx: Fixture) {
       });
     }
 
+    if (reviewable.length > 1)
+      reasons.push({
+        kind: 'warn',
+        text: `two unmerged dependencies (${reviewable.map((d) => d.num).join(', ')}) — you can only branch off one; land one first, or stack on whichever already contains the other`,
+      });
+
     if ((verdict === 'free' || verdict === 'stackable') && contestedWith.length) {
       verdict = 'contested';
       for (const c of contestedWith)
@@ -291,7 +297,14 @@ export function ago(iso: string | null | undefined): string {
 export function launchCommand(v: StageView, fx: Fixture) {
   const wtPath = v.worktree?.path ?? `${fx.worktreesDir ?? fx.repoPath + '-worktrees'}/${v.key}`;
   const stacked = v.stackOnBranches.length > 0;
-  const base = stacked ? v.stackOnBranches[0] : `origin/${fx.trunk}`;
+  // With several unmerged dependencies there is no single right base — say so rather
+  // than silently taking the first.
+  const ambiguous = v.stackOnBranches.length > 1;
+  const base = ambiguous
+    ? `<pick one: ${v.stackOnBranches.join(' | ')}>`
+    : stacked
+      ? v.stackOnBranches[0]
+      : `origin/${fx.trunk}`;
   const branch = v.worktree?.branch ?? `${fx.handle ?? 'me'}/${v.key}`;
   return {
     worktree: wtPath,
@@ -317,9 +330,12 @@ export function preambleFor(v: StageView, fx: Fixture): string {
     `/roadmap-next-stage ${fx.roadmap.slug} ${v.num}`,
     ``,
     `Brief: docs/roadmaps/${fx.roadmap.slug}/${v.briefFile}`,
-    `Depends on: ${deps}. Base: ${
-      v.stackOnBranches.length ? `stacked on ${v.stackOnBranches.join(' + ')} (open PR, not merged)` : 'fresh master'
-    }.`,
+    `Depends on: ${deps}.`,
+    v.stackOnBranches.length > 1
+      ? `Base: UNDECIDED. ${v.stackOnBranches.length} dependencies are open and unmerged — ${v.stackOnBranches.join(', ')}. You cannot branch off both: check whether one already contains the other (git merge-base --is-ancestor) and stack on the topmost, else wait for one to land. See /roadmap-next-stage step 4.`
+      : v.stackOnBranches.length === 1
+        ? `Base: stacked on ${v.stackOnBranches[0]} — its PR is open and ready, not merged.`
+        : `Base: fresh ${fx.trunk}.`,
     `Decisions in force: ${v.decisions.join(', ')}`,
     ``,
     ...(drift.length

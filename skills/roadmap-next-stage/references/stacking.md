@@ -16,6 +16,15 @@ on its code. `roadmap-tool` calls this **Ready · stack on 03**.
 merged bottom is pure overhead), or when the stages are independent. `Ready` with no
 "stack on" means branch off the trunk.
 
+**Don't stack on a draft.** `roadmap-tool` reads a draft PR as Running, not In PR, for
+exactly this reason: it is still being written. A stage depending on a draft reads Blocked
+until that PR is marked ready.
+
+**With two unmerged dependencies**, prefer the one that already contains the other — a
+single chain beats a fork. If they genuinely diverge, wait for one to land rather than
+merging them together to manufacture a base. See step 4 of
+[roadmap-next-stage](../SKILL.md).
+
 Stacking couples review: the bottom must land first, and a change to the bottom rebases
 everything above it. Only pay that when the code dependency is real.
 
