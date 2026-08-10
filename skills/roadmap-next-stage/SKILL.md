@@ -147,6 +147,8 @@ The rest:
 ## Related
 
 - [roadmap-format](../roadmap-format/SKILL.md) — the format this produces
+- [roadmap-author](../roadmap-author/SKILL.md) — designing a roadmap's stages and its
+  dependency graph
 - [stacking.md](references/stacking.md) — stacked stage PRs, start to land
 - [maintenance](../roadmap-format/references/maintenance.md) — run its audit before finishing
 - `gh-stack` — the full command surface and its non-interactive flags

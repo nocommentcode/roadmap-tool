@@ -8,7 +8,7 @@ const FIELDS = [
   'number', 'title', 'url', 'state', 'isDraft', 'baseRefName', 'headRefName',
   'reviewDecision', 'mergeStateStatus', 'mergeable', 'statusCheckRollup', 'reviews',
   'comments', 'additions', 'deletions', 'changedFiles', 'createdAt', 'updatedAt',
-  'mergedAt', 'mergeCommit', 'body',
+  'mergedAt', 'mergeCommit', 'body', 'files',
 ].join(',');
 
 const BOTS = new Set(['coderabbitai', 'github-actions', 'dependabot']);
@@ -46,10 +46,22 @@ export async function readGithub({ repo, trunk = 'master', limit = 40 }) {
       const roadmapStages = [...(d.body ?? '').matchAll(/^\s*Roadmap-Stage:\s*([\w.-]+)\/([\w.-]+)\s*$/gim)]
         .map((m) => ({ slug: m[1], stage: m[2] }));
 
+      // Which roadmaps this PR touches. Without it, the title fallback ("Stage 06")
+      // matches stage 06 of EVERY roadmap in the repo — four bundling stages were
+      // reading as Done off brain-chat-parity's PRs.
+      const roadmapsTouched = [
+        ...new Set(
+          (d.files ?? [])
+            .map((f) => f.path?.match(/^docs\/roadmaps\/([^/]+)\//)?.[1])
+            .filter(Boolean),
+        ),
+      ];
+
       return {
         number: d.number,
         title: d.title,
         roadmapStages,
+        roadmapsTouched,
         url: d.url,
         state: d.state,
         isDraft: d.isDraft,

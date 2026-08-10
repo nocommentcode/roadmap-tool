@@ -26,9 +26,16 @@ function matchPR(stage: Stage, prs: PR[], slug: string): { pr: PR; how: 'trailer
   const exact = prs.filter((p) => branchStem(p.headRefName) === stage.key);
   if (exact.length) return { pr: pickBest(exact), how: 'branch' };
 
-  // 3. Last resort: the PR title keeps the stage number ("Stage 06: the hybrid CLI").
-  //    Only helps until the next renumber — the row says so when this is what matched.
-  const byTitle = prs.filter((p) => new RegExp(`^stage\\s*0*${Number(stage.num)}\\b`, 'i').test(p.title));
+  // 3. Last resort: the PR title keeps the stage number ("Stage 06: …"). Scoped to PRs
+  //    that actually touch THIS roadmap's docs — a bare number matches stage 06 of every
+  //    roadmap in the repo otherwise. Only helps until the next renumber; the row says
+  //    when this is what matched.
+  const num = stage.num.match(/^\d+/)?.[0] ?? stage.num;
+  const byTitle = prs.filter(
+    (p) =>
+      (p.roadmapsTouched ?? []).includes(slug) &&
+      new RegExp(`^stage\\s*0*${Number(num)}[a-z]?\\b`, 'i').test(p.title),
+  );
   return byTitle.length ? { pr: pickBest(byTitle), how: 'title' } : null;
 }
 // prefer an open PR over a merged one; otherwise the most recent
@@ -60,7 +67,17 @@ function matchSessions(pr: PR | null, wt: Worktree | null, sessions: Session[]):
   );
 }
 
-function phaseOf(stage: Stage, pr: PR | null, wt: Worktree | null): Phase {
+/**
+ * Is there actual work here, or just the shell of an abandoned start?
+ *
+ * Creating a session creates a worktree, so a worktree alone proves nothing — stop and
+ * close that session and the directory stays behind. Running needs a live session, a
+ * pushed PR, or commits on the branch.
+ */
+const hasWork = (pr: PR | null, wt: Worktree | null, sessions: Session[]) =>
+  !!pr || sessions.some((s) => s.live) || (wt?.commits ?? 0) > 0;
+
+function phaseOf(stage: Stage, pr: PR | null, wt: Worktree | null, sessions: Session[]): Phase {
   // merged is merged — whether the merge commit survived into master is a
   // separate (and interesting) question, raised as a reason rather than a demotion.
   if (pr?.state === 'MERGED') return 'landed';
@@ -70,9 +87,15 @@ function phaseOf(stage: Stage, pr: PR | null, wt: Worktree | null): Phase {
   if (pr?.state === 'OPEN' && !pr.isDraft) return 'in_review';
   if (pr?.state === 'OPEN') return 'in_flight';
   if (stage.checked) return 'landed';
-  if (wt && !wt.prunable) return 'in_flight';
+  if (wt && !wt.prunable && hasWork(pr, wt, sessions)) return 'in_flight';
   return 'blocked'; // upgraded to 'ready' once deps are checked
 }
+
+/** Why a dependency isn't satisfied yet, in the words that tell you what to wait for. */
+const depState = (d: { phase: Phase; pr: PR | null }) =>
+  d.pr?.isDraft ? 'draft, not ready for review'
+  : d.phase === 'in_flight' ? 'in progress'
+  : 'not started';
 
 export function derive(fx: Fixture) {
   const stages = fx.roadmap.stages;
@@ -84,7 +107,7 @@ export function derive(fx: Fixture) {
     const pr = m?.pr ?? null;
     const worktree = matchWorktree(s, pr, fx.worktrees);
     const sessions = matchSessions(pr, worktree, fx.sessions);
-    return { ...s, pr, prMatchedBy: m?.how ?? null, worktree, sessions, phase: phaseOf(s, pr, worktree) };
+    return { ...s, pr, prMatchedBy: m?.how ?? null, worktree, sessions, phase: phaseOf(s, pr, worktree, sessions) };
   });
   const state = new Map(base.map((s) => [s.key, s]));
 
@@ -111,6 +134,8 @@ export function derive(fx: Fixture) {
 
     const deps = s.dependsOn.map((d) => state.get(d)!).filter(Boolean);
     const unlanded = deps.filter((d) => d.phase !== 'landed');
+    // Only stack on a dependency whose PR is READY. A draft is still being written, so
+    // its shape is still moving — stacking on it means rebasing onto a moving target.
     const reviewable = unlanded.filter((d) => d.phase === 'in_review');
     const notReady = unlanded.filter((d) => d.phase !== 'in_review');
 
@@ -150,14 +175,14 @@ export function derive(fx: Fixture) {
       phase = 'blocked';
       reasons.push({
         kind: 'bad',
-        text: `needs ${notReady.map((d) => d.num).join(', ')} (${notReady.map((d) => (d.phase === 'blocked' ? 'not started' : d.phase.replace('_', ' '))).join(', ')})`,
+        text: `needs ${notReady.map((d) => `${d.num} (${depState(d)})`).join(', ')}`,
       });
     } else if (reviewable.length) {
       verdict = 'stackable';
       phase = 'ready';
       reasons.push({
         kind: 'warn',
-        text: `stack on ${reviewable.map((d) => `${d.pr!.headRefName}`).join(' + ')} — in review, not merged`,
+        text: `stack on ${reviewable.map((d) => d.pr!.headRefName).join(' + ')} — ready for review, not merged`,
       });
     } else {
       verdict = 'free';
@@ -198,13 +223,23 @@ export function derive(fx: Fixture) {
     if (s.checked && s.pr?.state === 'OPEN')
       reasons.push({ kind: 'info', text: `ticked done on ${fx.roadmap.ref}, but #${s.pr.number} is still open` });
 
+    if (s.phase !== 'in_flight' && s.phase !== 'landed' && s.worktree && !s.worktree.prunable)
+      reasons.push({
+        kind: 'info',
+        text: `worktree exists but is empty — ${s.worktree.path.split('/').pop()}`,
+      });
+
     if (s.driftCommits > 20 && s.phase !== 'landed')
       reasons.push({ kind: 'info', text: `${s.driftCommits} commits to its files since the brief` });
 
-    // the five at-a-glance states
+    // The five at-a-glance states.
+    //
+    // A DRAFT PR counts as Running, not In PR. Claude typically opens the draft early
+    // and pushes into it incrementally, so a draft says "being written", not "awaiting
+    // review" — which is the distinction In PR exists to make.
     const status: Status =
       phase === 'landed' ? 'done'
-      : s.pr?.state === 'OPEN' ? 'in_pr'
+      : s.pr?.state === 'OPEN' && !s.pr.isDraft ? 'in_pr'
       : phase === 'in_flight' ? 'running'
       : verdict === 'blocked' ? 'blocked'
       : 'ready';

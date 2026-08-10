@@ -47,6 +47,8 @@ export type PR = {
   title: string;
   /** `Roadmap-Stage:` trailers in the PR body — the authoritative stage link */
   roadmapStages: { slug: string; stage: string }[];
+  /** roadmap slugs whose docs this PR touches — scopes the title fallback */
+  roadmapsTouched: string[];
   url: string;
   state: 'OPEN' | 'MERGED' | 'CLOSED';
   isDraft: boolean;
@@ -104,7 +106,14 @@ export type Session = {
   transcript?: boolean;
 };
 
-export type Worktree = { path: string; head?: string; branch?: string; prunable?: boolean };
+export type Worktree = {
+  path: string;
+  head?: string;
+  branch?: string;
+  prunable?: boolean;
+  /** commits on this branch beyond the trunk — 0 means nothing was done here */
+  commits?: number;
+};
 
 export type Fixture = {
   generatedAt: string;

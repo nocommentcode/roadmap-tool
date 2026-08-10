@@ -303,12 +303,20 @@ function Row({ v, fx, open, onToggle }: { v: StageView; fx: Fixture; open: boole
         onClick={onToggle}
         className="group flex w-full cursor-pointer items-center gap-5 py-5 text-left"
       >
-        <span className="w-6 shrink-0 text-sm font-medium tabular-nums text-zinc-700">{v.num}</span>
+        <span
+          className={`w-6 shrink-0 text-sm font-medium tabular-nums ${
+            v.status === 'done' ? 'text-zinc-700 line-through decoration-zinc-800' : 'text-zinc-700'
+          }`}
+        >
+          {v.num}
+        </span>
 
         <span className="min-w-0 flex-1">
           <span
             className={`block truncate text-[17px] font-semibold leading-snug ${
-              v.status === 'done' ? 'text-zinc-500' : v.status === 'blocked' ? 'text-zinc-500' : 'text-zinc-50'
+              v.status === 'done'
+              ? 'text-zinc-600 line-through decoration-zinc-700 decoration-[1.5px]'
+              : v.status === 'blocked' ? 'text-zinc-500' : 'text-zinc-50'
             } group-hover:text-white`}
           >
             {v.title}
@@ -407,7 +415,16 @@ function RowBadges({ v }: { v: StageView }) {
     const live = v.yourTurn ?? v.busy;
     if (live) out.push(<Badge key="rt" tone="sky" title={`session ${live.id.slice(0, 8)}`}>{runtime(live.live!.startedAt)}</Badge>);
     else if (v.sessions[0]) out.push(<Badge key="rt" tone="zinc">last {ago(v.sessions[0].mtime)}</Badge>);
-    if (v.worktree) out.push(<Badge key="wt" tone="zinc" title={v.worktree.path}>{v.worktree.path.split('/').pop()}</Badge>);
+    if (pr?.isDraft) {
+      if (pr.checksTotal) out.push(ciBadge(pr));
+      out.push(
+        <Badge key="pr" tone="zinc" title={`${pr.title} — draft, not open for review`}>
+          draft #{pr.number}
+        </Badge>,
+      );
+    } else if (v.worktree) {
+      out.push(<Badge key="wt" tone="zinc" title={v.worktree.path}>{v.worktree.path.split('/').pop()}</Badge>);
+    }
   } else if (v.status === 'blocked') {
     out.push(<Badge key="b" tone="zinc" title={v.waitingOnStages.map((d) => `${d.num} ${d.title}`).join('\n')}>by {v.waitingOn.join(', ')}</Badge>);
   } else if (v.status === 'ready' && v.stackOn.length) {
@@ -571,8 +588,28 @@ function RunningBody({ v, fx }: { v: StageView; fx: Fixture }) {
           <span className="text-zinc-600">Worktree</span>
           <span className="text-zinc-300">{v.worktree ? tilde(v.worktree.path, fx.home) : '—'}</span>
           <span className="text-zinc-600">PR</span>
-          <span className="text-zinc-400">not pushed yet</span>
+          <span>
+            {v.pr ? (
+              <>
+                <a href={v.pr.url} target="_blank" rel="noreferrer" className="text-violet-300 hover:underline">
+                  #{v.pr.number}
+                </a>
+                <span className="text-zinc-400">
+                  {' '}draft · opened {ago(v.pr.createdAt)}
+                  {v.pr.checksTotal ? ` · CI ${v.pr.checksPassed}/${v.pr.checksTotal}` : ''}
+                </span>
+              </>
+            ) : (
+              <span className="text-zinc-400">not pushed yet</span>
+            )}
+          </span>
         </div>
+        {v.pr?.isDraft && (
+          <p className="mt-3 max-w-prose text-sm text-zinc-500">
+            The draft is open, so work lands in it incrementally. Mark it ready for review
+            to move this stage to <span className="font-medium text-violet-300">In PR</span>.
+          </p>
+        )}
       </section>
       <SessionSection v={v} />
       <Heads v={v} fx={fx} />

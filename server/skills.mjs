@@ -30,8 +30,10 @@ export function missingSkills() {
 }
 
 export const WHY = `
-These two skills are what make the tool work end to end:
+These skills are what make the tool work end to end:
 
+  roadmap-author      designing a roadmap: stages, and a dependency graph shaped for
+                      parallelism — depends_on is what the whole tool reads
   roadmap-format      the format it reads — brief frontmatter, the decision index,
                       and the "Roadmap-Stage:" PR trailer that tells it which pull
                       request closes which stage

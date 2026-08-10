@@ -84,7 +84,7 @@ has a flag:
 
 ## The skills
 
-The tool ships two Claude Code skills and **does not work properly without them** —
+The tool ships three Claude Code skills and **does not work properly without them** —
 *Start this phase* hands its generated preamble to `/roadmap-next-stage`, and the format
 they define is what the tool reads. So **installing the package installs them**, into
 `~/.claude/skills`, as a `postinstall` step. Restart Claude Code to pick them up.
@@ -102,6 +102,8 @@ npx github:nocommentcode/roadmap-tool --install-skills
 Both names are prefixed `roadmap-` so they don't collide with a `/next-stage` you may
 already have.
 
+- **`/roadmap-author`** — designing a roadmap: decomposing into stages and shaping the
+  dependency graph so work can run in parallel without breaking cohesive units
 - **`/roadmap-format`** — ROADMAP.md structure, brief frontmatter, the decision index,
   the `Roadmap-Stage:` PR trailer, splitting, and a maintenance/audit reference
 - **`/roadmap-next-stage`** — starting a stage: pick the ref, re-ground the brief, create

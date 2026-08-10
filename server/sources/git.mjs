@@ -22,6 +22,17 @@ export async function readGit({ repo, trunk = 'master' }) {
   }
   if (cur.path) worktrees.push(cur);
 
+  // How much work actually exists on each worktree's branch. A worktree on its own is
+  // not evidence of work — starting a session creates one, and abandoning that session
+  // leaves it behind with nothing in it.
+  await Promise.all(
+    worktrees.map(async (w) => {
+      if (!w.branch) return;
+      const n = (await sh('git', ['rev-list', '--count', `origin/${trunk}..${w.branch}`], repo)).trim();
+      w.commits = /^\d+$/.test(n) ? +n : 0;
+    }),
+  );
+
   return { worktrees, masterHead: masterHead.trim() };
 }
 

@@ -295,6 +295,8 @@ numbers where keys belong, and PRs missing their trailer.
 
 ## Related
 
+- [roadmap-author](../roadmap-author/SKILL.md) — designing the stages in the first place,
+  and shaping the dependency graph for parallelism
 - [splitting.md](references/splitting.md) — splitting a stage across branches
 - [maintenance.md](references/maintenance.md) — propagation rules and the audit
 - [pr-body.md](references/pr-body.md) — the full PR body format
