@@ -108,7 +108,17 @@ stage being renamed after its branch exists.
 
 ## 6. Keep the roadmap honest as you go
 
-The roadmap is part of the stage's deliverable, edited on the same branch:
+The roadmap is part of the stage's deliverable, edited on the same branch.
+
+**The one that matters: if you discover a dependency, record it.** Working a stage is
+when you find out what it actually needs — a stage you assumed was independent turns out
+to need the store, or the half of a split you didn't expect. `depends_on:` is the only
+source of blocked status, so an edge you learned about and did not write down means the
+board tells the next person something false: a blocked stage reading as Ready, and a
+failure hours into it. Add the edge to whichever brief needs it, in the same commit as
+the discovery.
+
+The rest:
 
 - Tick `- [x]` when the work is committed
 - Add a decision to the index when the stage settles one — new ID, never reused
@@ -116,6 +126,11 @@ The roadmap is part of the stage's deliverable, edited on the same branch:
   halves `supersedes: [<original-key>]`, and grep for the old key — see
   [splitting](../roadmap-format/references/splitting.md)
 - Record anything found-but-not-done under `## Found while building, needing its own stage`
+- Leave *existing* `depends_on:` edges alone unless they became wrong — dependencies are
+  structural, not progress. Ticking a box is how progress is recorded.
+- **Run the [audit](../roadmap-format/references/maintenance.md#the-audit) before you
+  finish**, and fix what it finds. It catches dangling edges, a `stage:` that no longer
+  matches its filename, numbers where keys belong, and PRs missing their trailer.
 
 ## Checklist
 
@@ -124,7 +139,10 @@ The roadmap is part of the stage's deliverable, edited on the same branch:
 - [ ] Brief re-grounded and what moved reported
 - [ ] Worktree on `<handle>/<stage-key>`
 - [ ] Draft PR open, titled with the stage, carrying `Roadmap-Stage:`
-- [ ] Brief frontmatter present and correct
+- [ ] Brief frontmatter present and correct — `stage:` matches the filename stem,
+      `depends_on:` lists every real dependency as keys
+- [ ] Any dependency discovered while working is written into `depends_on:`
+- [ ] The maintenance audit passes
 
 ## Related
 
