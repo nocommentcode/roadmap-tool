@@ -131,7 +131,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (!fs.existsSync(file)) {
     res.writeHead(404, { 'content-type': 'text/plain' });
-    return res.end('no dist/ built — run `npm run dev` for the Vite server');
+    return res.end('no dist/ built — run `npm start`, or `npm run dev` for the Vite server');
   }
   res.writeHead(200, { 'content-type': MIME[path.extname(file)] ?? 'application/octet-stream' });
   fs.createReadStream(file).pipe(res);
@@ -143,6 +143,26 @@ const server = http.createServer(async (req, res) => {
  * clone it never exists — so telling everyone to run `roadmap-tool …` is wrong for
  * two of the three ways people actually run this.
  */
+/** How far behind the built bundle is, or null if it is current. */
+function staleBundle() {
+  const index = path.join(ROOT, 'dist', 'index.html');
+  const src = path.join(ROOT, 'src');
+  if (!fs.existsSync(index) || !fs.existsSync(src)) return null;
+  const built = fs.statSync(index).mtimeMs;
+  let newest = 0;
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else newest = Math.max(newest, fs.statSync(p).mtimeMs);
+    }
+  };
+  walk(src);
+  if (newest <= built) return null;
+  const hours = Math.round((newest - built) / 3_600_000);
+  return hours >= 24 ? `${Math.round(hours / 24)}d` : `${Math.max(1, hours)}h`;
+}
+
 function selfCommand(args) {
   const entry = process.argv[1] ?? '';
   if (entry.includes('/_npx/')) return `npx github:nocommentcode/roadmap-tool ${args}`;
@@ -161,6 +181,10 @@ server.listen(PORT, '127.0.0.1', () => {
   log(`roadmap-tool → http://127.0.0.1:${PORT}`);
   log(`  ${config.repo} · ${config.slug} · trunk ${config.trunk} · branches ${config.handle}/<stage>`);
   if (config.roadmaps.length > 1) log(`  other roadmaps here: ${config.roadmaps.filter((r) => r !== config.slug).join(', ')}`);
+  // A bundle older than the source is served silently and looks like the tool ignoring
+  // your changes — which is exactly how it went wrong once.
+  const stale = staleBundle();
+  if (stale) log(`  ⚠ dist/ is ${stale} older than src/ — rebuild with \`npm start\``);
   // mention the skills once, rather than installing them behind your back
   const missing = missingSkills();
   if (missing.length) {

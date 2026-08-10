@@ -36,5 +36,9 @@ function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-run('server', process.execPath, ['server/index.mjs', '--no-open', ...process.argv.slice(2)], '36');
+// Vite owns 5290 and proxies /api to the server, so the server takes 5291 unless the
+// caller pins a port explicitly.
+const args = process.argv.slice(2);
+const hasPort = args.some((a) => a === '-p' || a === '--port' || a.startsWith('--port='));
+run('server', process.execPath, ['server/index.mjs', '--no-open', ...(hasPort ? [] : ['-p', '5291']), ...args], '36');
 run('vite', 'npx', ['vite'], '35');
