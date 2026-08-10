@@ -45,5 +45,13 @@ export function useRoadmapState() {
       body: JSON.stringify({ ref }),
     });
 
-  return { state, connection, refresh, setRef };
+  /** Switch to another roadmap in the same repo. */
+  const setRoadmap = (slug: string) =>
+    void fetch('/api/roadmap', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ slug }),
+    });
+
+  return { state, connection, refresh, setRef, setRoadmap };
 }

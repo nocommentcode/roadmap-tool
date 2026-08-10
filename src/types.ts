@@ -133,6 +133,8 @@ export type Fixture = {
     diverged: { branch: string; ahead: number }[];
   };
   pinnedRef: string | null;
+  /** every roadmap in this repo */
+  roadmaps: string[];
   /** every version of the roadmap that exists right now */
   availableRefs: {
     ref: string;

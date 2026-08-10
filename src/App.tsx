@@ -3,7 +3,7 @@ import { useRoadmapState } from './lib/useRoadmapState';
 import { RoadmapView } from './RoadmapView';
 
 export function App() {
-  const { state, connection, refresh, setRef } = useRoadmapState();
+  const { state, connection, refresh, setRef, setRoadmap } = useRoadmapState();
 
   if (!state?.roadmap) {
     return (
@@ -27,5 +27,5 @@ export function App() {
   }
 
   const { views } = derive(state);
-  return <RoadmapView views={views} fx={state} connection={connection} onRefresh={refresh} onPickRef={setRef} />;
+  return <RoadmapView views={views} fx={state} connection={connection} onRefresh={refresh} onPickRef={setRef} onPickRoadmap={setRoadmap} />;
 }

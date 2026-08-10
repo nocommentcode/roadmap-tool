@@ -98,13 +98,14 @@ const H = ({ children }: { children: React.ReactNode }) => (
 /* ── page ────────────────────────────────────────────────────────────── */
 
 export function RoadmapView({
-  views, fx, connection, onRefresh, onPickRef,
+  views, fx, connection, onRefresh, onPickRef, onPickRoadmap,
 }: {
   views: StageView[];
   fx: Fixture;
   connection: 'connecting' | 'live' | 'reconnecting';
   onRefresh: () => void;
   onPickRef: (ref: string) => void;
+  onPickRoadmap: (slug: string) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
 
@@ -115,7 +116,7 @@ export function RoadmapView({
 
   return (
     <div className="flex min-h-screen">
-      <VersionRail fx={fx} onPickRef={onPickRef} />
+      <VersionRail fx={fx} onPickRef={onPickRef} onPickRoadmap={onPickRoadmap} />
 
       <div className="mx-auto max-w-3xl flex-1 px-8 py-12 pb-32">
       <div className="flex items-start justify-between gap-4">
@@ -184,15 +185,36 @@ export function RoadmapView({
  * that version alone — which is the only way to see a stage a branch DELETED, since the
  * merged view is a union and a union cannot subtract.
  */
-function VersionRail({ fx, onPickRef }: { fx: Fixture; onPickRef: (ref: string) => void }) {
+function VersionRail({
+  fx, onPickRef, onPickRoadmap,
+}: {
+  fx: Fixture;
+  onPickRef: (ref: string) => void;
+  onPickRoadmap: (slug: string) => void;
+}) {
   const refs = [...(fx.availableRefs ?? [])].reverse(); // newest first
   const active = fx.pinnedRef ?? ':merged';
-  if (!refs.length) return null;
+  const roadmaps = fx.roadmaps ?? [fx.roadmap.slug];
 
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 overflow-y-auto border-r border-zinc-900 px-4 py-12 lg:block">
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-600">Roadmap</div>
+      {roadmaps.length > 1 ? (
+        <select
+          value={fx.roadmap.slug}
+          onChange={(e) => onPickRoadmap(e.target.value)}
+          className="mb-8 w-full cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/60 px-2 py-1.5 text-[13px] font-semibold text-zinc-200 outline-none hover:border-zinc-700 focus:border-zinc-600"
+        >
+          {roadmaps.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+      ) : (
+        <div className="mb-8 text-[13px] font-semibold text-zinc-300">{fx.roadmap.slug}</div>
+      )}
+
       <div className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-600">
-        Roadmap version
+        Version
       </div>
 
       <div className="relative">

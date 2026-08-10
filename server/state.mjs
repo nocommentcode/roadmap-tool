@@ -34,6 +34,7 @@ export class RoadmapState extends EventEmitter {
     this.stateHash = null;
     this.timers = [];
     this.watchers = [];
+    this.docsWatcher = null;
     this.refreshing = new Set();
     /** a refresh asked for while one was in flight — run it after, don't drop it */
     this.pending = new Set();
@@ -54,6 +55,7 @@ export class RoadmapState extends EventEmitter {
       head: head ?? { ref: this.config.trunk, ahead: 0, candidates: [], diverged: [] },
       pinnedRef: this.pinnedRef,
       availableRefs: refs,
+      roadmaps: this.config.roadmaps ?? [roadmap.slug],
       roadmap,
       decisionDrift,
       liveSessions: claude.liveSessions,
@@ -203,20 +205,42 @@ export class RoadmapState extends EventEmitter {
     // (mtime, size) cache means unchanged files are never re-read.
     this.timers.push(setInterval(() => this.refresh('claude', 'transcripts'), 2000));
 
-    // ── watch: the roadmap docs
-    const docs = path.join(this.config.repo, 'docs/roadmaps', this.config.slug);
-    if (fs.existsSync(docs)) {
-      const onDocs = debounce(() => this.refresh('roadmap', 'roadmap docs'), 300);
-      this.watchers.push(fs.watch(docs, onDocs));
-    }
+    this.watchDocs();
 
     // ── poll: git and github
     this.timers.push(setInterval(() => this.refresh('git'), this.config.poll?.git ?? 5000));
     this.timers.push(setInterval(() => this.refresh('github'), this.config.poll?.github ?? 60000));
   }
 
+  /** Watch this roadmap's directory, replacing any previous one. */
+  watchDocs() {
+    this.docsWatcher?.close();
+    this.docsWatcher = null;
+    const docs = path.join(this.config.repo, 'docs/roadmaps', this.config.slug);
+    if (!fs.existsSync(docs)) return;
+    const onDocs = debounce(() => this.refresh('roadmap', 'roadmap docs'), 300);
+    this.docsWatcher = fs.watch(docs, onDocs);
+  }
+
+  /**
+   * Switch to another roadmap in the same repo. Everything roadmap-shaped is derived
+   * from the slug, so head, pinned version and the docs watcher all reset.
+   */
+  async setSlug(slug) {
+    if (!this.config.roadmaps?.includes(slug) || slug === this.config.slug) return false;
+    log(`roadmap → ${slug}`);
+    this.config.slug = slug;
+    this.pinnedRef = null;
+    this.parts.head = null;
+    this.parts.refs = [];
+    this.watchDocs();
+    await this.refresh('roadmap', 'roadmap switched');
+    return true;
+  }
+
   stop() {
     this.timers.forEach(clearInterval);
     this.watchers.forEach((w) => w.close());
+    this.docsWatcher?.close();
   }
 }

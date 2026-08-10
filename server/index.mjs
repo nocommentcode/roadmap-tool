@@ -104,6 +104,14 @@ const server = http.createServer(async (req, res) => {
     return res.end(JSON.stringify(result));
   }
 
+  // switch to another roadmap in this repo; body {slug}
+  if (url.pathname === '/api/roadmap' && req.method === 'POST') {
+    const { slug } = await readJson(req);
+    const ok = await state.setSlug(slug);
+    res.writeHead(ok ? 200 : 400, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify({ ok, slug: config.slug, roadmaps: config.roadmaps }));
+  }
+
   // pick which version of the roadmap to show; body {ref} — ':merged' for the union
   if (url.pathname === '/api/ref' && req.method === 'POST') {
     const { ref } = await readJson(req);
