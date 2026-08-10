@@ -12,9 +12,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
-import { readRoadmap, readDecisionDrift } from './sources/roadmap.mjs';
+import { readRoadmap, readDecisionDrift, WORKTREE_PREFIX } from './sources/roadmap.mjs';
+import { listRoadmapRefs, MERGED } from './refs.mjs';
 import { mergeRoadmaps } from './merge.mjs';
-import { readGit, resolveRoadmapHead } from './sources/git.mjs';
+import { readGit, resolveRoadmapHead, fetchTrunk } from './sources/git.mjs';
 import { readGithub } from './sources/github.mjs';
 import { readSessions, SESSIONS_DIR } from './sources/claude.mjs';
 import { debounce, hash, log } from './util.mjs';
@@ -23,18 +24,23 @@ export class RoadmapState extends EventEmitter {
   constructor(config) {
     super();
     this.config = config;
-    this.parts = { roadmap: null, git: null, github: null, claude: null, decisionDrift: [], head: null };
-    /** ref override from the UI; null = auto-resolve to the newest roadmap */
+    this.parts = {
+      roadmap: null, git: null, github: null, claude: null,
+      decisionDrift: [], head: null, refs: [],
+    };
+    /** which version the UI picked; null = the merged view */
     this.pinnedRef = null;
     this.state = null;
     this.stateHash = null;
     this.timers = [];
     this.watchers = [];
     this.refreshing = new Set();
+    /** a refresh asked for while one was in flight — run it after, don't drop it */
+    this.pending = new Set();
   }
 
   compose() {
-    const { roadmap, git, github, claude, decisionDrift, head } = this.parts;
+    const { roadmap, git, github, claude, decisionDrift, head, refs } = this.parts;
     if (!roadmap || !git || !github || !claude) return null;
     return {
       generatedAt: new Date().toISOString(),
@@ -47,6 +53,7 @@ export class RoadmapState extends EventEmitter {
       masterHead: git.masterHead,
       head: head ?? { ref: this.config.trunk, ahead: 0, candidates: [], diverged: [] },
       pinnedRef: this.pinnedRef,
+      availableRefs: refs,
       roadmap,
       decisionDrift,
       liveSessions: claude.liveSessions,
@@ -84,7 +91,13 @@ export class RoadmapState extends EventEmitter {
   }
 
   async refresh(source, reason = source) {
-    if (this.refreshing.has(source)) return; // a slow gh call must not stack up
+    // A slow gh call must not stack up — but a request that arrives mid-flight cannot
+    // just be dropped either. Dropping it lost the roadmap re-read whenever the head
+    // moved during the initial parallel load, leaving the roadmap on the trunk alone.
+    if (this.refreshing.has(source)) {
+      this.pending.add(source);
+      return;
+    }
     this.refreshing.add(source);
     const t0 = Date.now();
     try {
@@ -100,7 +113,16 @@ export class RoadmapState extends EventEmitter {
           break;
         case 'roadmap': {
           if (!this.parts.head) await this.resolveHead();
-          if (this.pinnedRef) {
+          this.parts.refs = await listRoadmapRefs(this.config, {
+            head: this.parts.head,
+            prs: this.parts.github?.prs ?? [],
+            worktrees: this.parts.git?.worktrees ?? [],
+          });
+
+          // A pinned version is read alone. That is the point: the merged view unions
+          // everything and so cannot represent a stage a branch DELETED, unless its
+          // replacement declares `supersedes:`.
+          if (this.pinnedRef && this.pinnedRef !== MERGED) {
             this.parts.roadmap = await readRoadmap(this.config, this.pinnedRef);
             this.parts.roadmap.ref = this.pinnedRef;
             this.parts.roadmap.refs = [this.pinnedRef];
@@ -122,11 +144,21 @@ export class RoadmapState extends EventEmitter {
             ...o,
             depth: head?.candidates?.find((c) => c.branch === o.ref)?.ahead ?? 0,
           }));
+
+          // Uncommitted edits, in any worktree, as the deepest overlays — you should
+          // see a roadmap you are part-way through editing.
+          for (const r of this.parts.refs.filter((x) => x.kind === 'worktree')) {
+            const wt = await readRoadmap(this.config, r.ref).catch(() => null);
+            if (wt) overlays.push({ ref: r.ref, roadmap: wt, depth: Number.MAX_SAFE_INTEGER });
+          }
           this.parts.roadmap = mergeRoadmaps(base, overlays, trunk);
           this.parts.roadmap.ref = head?.ref ?? trunk;
           break;
         }
         case 'github':
+          // origin/<trunk> is only as fresh as the last fetch, and everything is
+          // measured against it — so refresh the refs on the same slow cadence.
+          if (this.config.fetch !== false) await fetchTrunk(this.config.repo, this.config.trunk);
           this.parts.github = await readGithub(this.config);
           // PR state decides which branches count as alive
           if (await this.resolveHead()) await this.refresh('roadmap', 'roadmap head moved');
@@ -151,6 +183,7 @@ export class RoadmapState extends EventEmitter {
       log(`refresh(${source}) failed:`, e.message);
     } finally {
       this.refreshing.delete(source);
+      if (this.pending.delete(source)) await this.refresh(source, `${reason} (coalesced)`);
     }
   }
 

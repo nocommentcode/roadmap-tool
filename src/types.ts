@@ -133,6 +133,18 @@ export type Fixture = {
     diverged: { branch: string; ahead: number }[];
   };
   pinnedRef: string | null;
+  /** every version of the roadmap that exists right now */
+  availableRefs: {
+    ref: string;
+    kind: 'trunk' | 'branch' | 'worktree' | 'merged';
+    label: string;
+    sublabel: string;
+    ahead: number;
+    pr: number | null;
+    worktreePath: string | null;
+    when: string | null;
+    subject: string | null;
+  }[];
   decisionDrift: DecisionDrift[];
   liveSessions: LiveSession[];
   worktrees: Worktree[];

@@ -104,6 +104,16 @@ const server = http.createServer(async (req, res) => {
     return res.end(JSON.stringify(result));
   }
 
+  // pick which version of the roadmap to show; body {ref} — ':merged' for the union
+  if (url.pathname === '/api/ref' && req.method === 'POST') {
+    const { ref } = await readJson(req);
+    state.pinnedRef = ref && ref !== ':merged' ? ref : null;
+    log(`roadmap version → ${state.pinnedRef ?? 'merged view'}`);
+    await state.refresh('roadmap', 'version picked');
+    res.writeHead(200, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, pinnedRef: state.pinnedRef }));
+  }
+
   if (url.pathname === '/api/refresh' && req.method === 'POST') {
     const source = url.searchParams.get('source');
     await Promise.all(

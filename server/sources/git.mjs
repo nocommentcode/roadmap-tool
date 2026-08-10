@@ -29,8 +29,24 @@ export async function readGit({ repo, trunk = 'master' }) {
 export const isAncestorOfMaster = (repo, oid, trunk = 'master') =>
   ok('git', ['merge-base', '--is-ancestor', oid, `origin/${trunk}`], repo);
 
+/** Uncommitted roadmap edits in the main checkout. */
+export async function roadmapIsDirty(repo, slug) {
+  const out = await sh('git', ['status', '--porcelain', '--', `docs/roadmaps/${slug}/`], repo);
+  return out.trim().length > 0;
+}
+
+/** Update the remote refs everything is measured against. Read-only for the worktree. */
+export async function fetchTrunk(repo, trunk) {
+  return ok('git', ['fetch', '--quiet', 'origin', trunk], repo);
+}
+
 /**
  * Which ref holds the CURRENT roadmap?
+ *
+ * Everything is measured against `origin/<trunk>`, never the local branch of the same
+ * name. A local trunk drifts — 116 commits behind, in the repo this was built against —
+ * and a merged branch then still counts as "ahead", so it stays a live roadmap
+ * candidate long after it landed.
  *
  * Working a stage rewrites the roadmap itself — stages split, decisions get added,
  * checkboxes get ticked. So the trunk's copy goes stale the moment a stage starts, and
@@ -49,7 +65,7 @@ export async function resolveRoadmapHead({ repo, slug, trunk = 'master' }, { ope
   await Promise.all(
     alive.map(async (branch) => {
       const n = (
-        await sh('git', ['rev-list', '--count', `${trunk}..${branch}`, '--', `docs/roadmaps/${slug}/`], repo)
+        await sh('git', ['rev-list', '--count', `origin/${trunk}..${branch}`, '--', `docs/roadmaps/${slug}/`], repo)
       ).trim();
       if (!/^\d+$/.test(n) || +n === 0) return;
       const oid = (await sh('git', ['rev-parse', branch], repo)).trim();

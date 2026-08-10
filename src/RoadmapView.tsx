@@ -98,12 +98,13 @@ const H = ({ children }: { children: React.ReactNode }) => (
 /* ── page ────────────────────────────────────────────────────────────── */
 
 export function RoadmapView({
-  views, fx, connection, onRefresh,
+  views, fx, connection, onRefresh, onPickRef,
 }: {
   views: StageView[];
   fx: Fixture;
   connection: 'connecting' | 'live' | 'reconnecting';
   onRefresh: () => void;
+  onPickRef: (ref: string) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
 
@@ -113,7 +114,10 @@ export function RoadmapView({
   const turns = views.filter((v) => v.yourTurn);
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-12 pb-32">
+    <div className="flex min-h-screen">
+      <VersionRail fx={fx} onPickRef={onPickRef} />
+
+      <div className="mx-auto max-w-3xl flex-1 px-8 py-12 pb-32">
       <div className="flex items-start justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-zinc-50">{fx.roadmap.title}</h1>
         <button
@@ -170,11 +174,71 @@ export function RoadmapView({
           ))}
         </section>
       )}
+      </div>
     </div>
   );
 }
 
-/** Where this roadmap was read from. Master goes stale the moment a stage starts. */
+/**
+ * Every version of the roadmap, oldest at the bottom like a stack. Clicking one shows
+ * that version alone — which is the only way to see a stage a branch DELETED, since the
+ * merged view is a union and a union cannot subtract.
+ */
+function VersionRail({ fx, onPickRef }: { fx: Fixture; onPickRef: (ref: string) => void }) {
+  const refs = [...(fx.availableRefs ?? [])].reverse(); // newest first
+  const active = fx.pinnedRef ?? ':merged';
+  if (!refs.length) return null;
+
+  return (
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 overflow-y-auto border-r border-zinc-900 px-4 py-12 lg:block">
+      <div className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-600">
+        Roadmap version
+      </div>
+
+      <div className="relative">
+        {/* the spine */}
+        <div className="absolute bottom-2 left-[5px] top-2 w-px bg-zinc-900" />
+
+        {refs.map((r) => {
+          const on = r.ref === active;
+          const tone =
+            r.kind === 'merged' ? 'text-zinc-300'
+            : r.kind === 'worktree' ? 'text-amber-300'
+            : r.kind === 'branch' ? 'text-violet-300'
+            : 'text-zinc-400';
+          return (
+            <button
+              key={r.ref}
+              onClick={() => onPickRef(r.ref)}
+              title={r.subject ?? undefined}
+              className="group relative block w-full cursor-pointer py-2 pl-6 pr-1 text-left"
+            >
+              <span
+                className={`absolute left-0 top-[13px] size-[11px] rounded-full border-2 ${
+                  on
+                    ? 'border-zinc-100 bg-zinc-100'
+                    : 'border-zinc-700 bg-zinc-950 group-hover:border-zinc-500'
+                }`}
+              />
+              <span className={`block truncate text-[13px] font-semibold ${on ? 'text-zinc-50' : tone}`}>
+                {r.label}
+              </span>
+              <span className="mt-0.5 block truncate text-[11px] text-zinc-600">{r.sublabel}</span>
+              {r.when && <span className="block text-[11px] text-zinc-700">{ago(r.when)}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="mt-6 border-t border-zinc-900 pt-4 text-[11px] leading-relaxed text-zinc-600">
+        The merged view unions every version, so it shows stages a branch has{' '}
+        <em>removed</em> as well as added. Pick a single version to see it exactly.
+      </p>
+    </aside>
+  );
+}
+
+/** Where this roadmap was read from. The trunk goes stale the moment a stage starts. */
 function Provenance({ fx }: { fx: Fixture }) {
   const { head, roadmap } = fx;
   const onBranch = roadmap.ref !== 'master';

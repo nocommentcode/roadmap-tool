@@ -27,6 +27,8 @@ Options
       --terminal <bin>     Terminal emulator to launch sessions in.
                            Default: the first one found.
       --no-open            Don't open a browser on start.
+      --no-fetch           Skip the periodic git fetch — measure against the origin
+                           refs exactly as they are on disk.
       --install-skills     Symlink this package's Claude Code skills into
                            ~/.claude/skills, then exit. Not done automatically.
       --uninstall-skills   Remove those links again. Only ever removes links it
@@ -58,6 +60,7 @@ export function parseArgs(argv) {
     const a = argv[i];
     if (a === '-h' || a === '--help') return { help: true };
     if (a === '--no-open') { out.open = false; continue; }
+    if (a === '--no-fetch') { out.fetch = false; continue; }
     if (a === '--install-skills' || a === '--uninstall-skills') continue; // handled earlier
     const key = FLAGS[a.split('=')[0]];
     if (!key) {
@@ -144,6 +147,7 @@ export async function resolveConfig(argv, cwd = process.cwd()) {
     worktreesDir: path.resolve(args.worktrees ?? file.worktreesDir ?? `${repo}-worktrees`),
     terminal: args.terminal ?? file.terminal ?? null,
     open: args.open ?? file.open ?? true,
+    fetch: args.fetch ?? file.fetch ?? true,
     home: os.homedir(),
     dependsOn: file.dependsOn ?? {},
     poll: file.poll ?? {},

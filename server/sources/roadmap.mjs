@@ -42,18 +42,23 @@ function frontmatter(md) {
   return out;
 }
 
+/** `worktree:/abs/path` reads that working tree's files — uncommitted edits included. */
+export const WORKTREE_PREFIX = 'worktree:';
+const worktreeOf = (ref) => (ref?.startsWith(WORKTREE_PREFIX) ? ref.slice(WORKTREE_PREFIX.length) : null);
+
 /**
- * Read a file from a git ref rather than the working tree, so the roadmap can come
- * from wherever it is newest. `master` still reads the checkout, so uncommitted edits
- * show up while you're writing them.
+ * Read a file from a git ref. The trunk means `origin/<trunk>`, not the local branch of
+ * the same name, which drifts. A working tree is reachable only when asked for by name,
+ * so a checkout sitting on a feature branch cannot silently become the base.
  */
 async function readAt(repo, ref, rel, trunk) {
-  // reading the trunk means the working tree, so uncommitted edits show up live
-  if (!ref || ref === trunk) {
-    const p = path.join(repo, rel);
+  const wt = worktreeOf(ref);
+  if (wt) {
+    const p = path.join(wt, rel);
     return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '';
   }
-  return sh('git', ['show', `${ref}:${rel}`], repo);
+  const resolved = !ref || ref === trunk ? `origin/${trunk}` : ref;
+  return sh('git', ['show', `${resolved}:${rel}`], repo);
 }
 
 /**
@@ -123,7 +128,7 @@ export async function readRoadmap({ repo, slug, dependsOn = {}, trunk = 'master'
   await Promise.all(
     stages.map(async (s) => {
       s.briefLastTouched = (
-        await sh('git', ['log', '-1', '--format=%cI', ref === trunk ? `origin/${trunk}` : ref, '--', rel(s.briefFile)], repo)
+        await sh('git', ['log', '-1', '--format=%cI', ref === trunk || worktreeOf(ref) ? `origin/${trunk}` : ref, '--', rel(s.briefFile)], repo)
       ).trim();
       if (!s.briefLastTouched || !s.touches.length) return;
       const n = (
