@@ -98,13 +98,30 @@ async function detectHandle(repo) {
 }
 
 /** Roadmaps are directories under docs/roadmaps/ containing a ROADMAP.md. */
-export function listRoadmaps(repo) {
-  const dir = path.join(repo, 'docs/roadmaps');
+export function listRoadmaps(root) {
+  const dir = path.join(root, 'docs/roadmaps');
   if (!fs.existsSync(dir)) return [];
   return fs
     .readdirSync(dir)
     .filter((d) => fs.existsSync(path.join(dir, d, 'ROADMAP.md')))
     .sort();
+}
+
+/**
+ * The union across the main checkout and every worktree. A roadmap being authored on a
+ * branch exists only in its worktree until the PR lands, so the trunk alone misses it.
+ */
+export function listAllRoadmaps(repo, worktreePaths = []) {
+  return [...new Set([repo, ...worktreePaths].flatMap(listRoadmaps))].sort();
+}
+
+/** Every working tree of this repo, the main checkout included. */
+export async function worktreePaths(repo) {
+  const out = await sh('git', ['worktree', 'list', '--porcelain'], repo);
+  return out
+    .split('\n')
+    .filter((l) => l.startsWith('worktree '))
+    .map((l) => l.slice(9));
 }
 
 export async function resolveConfig(argv, cwd = process.cwd()) {
@@ -126,11 +143,11 @@ export async function resolveConfig(argv, cwd = process.cwd()) {
   const adjacent = read(path.join(import.meta.dirname, '..', 'roadmap.config.json'));
   const file = local ?? (adjacent && path.resolve(adjacent.repo ?? '') === repo ? adjacent : {}) ?? {};
 
-  const roadmaps = listRoadmaps(repo);
+  const roadmaps = listAllRoadmaps(repo, await worktreePaths(repo));
   let slug = args.roadmap ?? process.env.ROADMAP_SLUG ?? file.slug;
   if (!slug) {
     if (roadmaps.length === 1) slug = roadmaps[0];
-    else if (roadmaps.length === 0) return { error: `no roadmaps found under ${repo}/docs/roadmaps/` };
+    else if (roadmaps.length === 0) return { error: `no roadmaps found under ${repo}/docs/roadmaps/ (or in any worktree)` };
     else return { error: `several roadmaps here — pick one with --roadmap:\n${roadmaps.map((r) => `  ${r}`).join('\n')}` };
   }
   if (!roadmaps.includes(slug)) {

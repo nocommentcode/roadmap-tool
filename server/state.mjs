@@ -17,6 +17,7 @@ import { listRoadmapRefs } from './refs.mjs';
 import { readGit, resolveRoadmapHead, fetchTrunk } from './sources/git.mjs';
 import { readGithub } from './sources/github.mjs';
 import { readSessions, SESSIONS_DIR } from './sources/claude.mjs';
+import { listAllRoadmaps } from './config.mjs';
 import { debounce, hash, log } from './util.mjs';
 
 export class RoadmapState extends EventEmitter {
@@ -33,7 +34,7 @@ export class RoadmapState extends EventEmitter {
     this.stateHash = null;
     this.timers = [];
     this.watchers = [];
-    this.docsWatcher = null;
+    this.docsWatchers = [];
     this.refreshing = new Set();
     /** a refresh asked for while one was in flight — run it after, don't drop it */
     this.pending = new Set();
@@ -106,12 +107,30 @@ export class RoadmapState extends EventEmitter {
         case 'claude':
           this.parts.claude = readSessions({ repo: this.config.repo });
           break;
-        case 'git':
+        case 'git': {
+          const before = (this.parts.git?.worktrees ?? []).map((w) => w.path).sort().join('\n');
           this.parts.git = await readGit(this.config);
-          // Re-resolving is cheap; re-reading the roadmap is not. Only re-read when the
-          // resolved head actually moved — a new commit on the stack, or a new stack.
-          if (await this.resolveHead()) await this.refresh('roadmap', 'roadmap head moved');
+          const wtPaths = this.parts.git.worktrees.map((w) => w.path);
+
+          // A roadmap can exist only in a worktree — authored on a branch that hasn't
+          // landed — so the list of roadmaps is a live question, not a startup constant.
+          const roadmaps = listAllRoadmaps(this.config.repo, wtPaths);
+          if (JSON.stringify(roadmaps) !== JSON.stringify(this.config.roadmaps)) {
+            this.config.roadmaps = roadmaps;
+          }
+
+          const worktreesChanged = wtPaths.sort().join('\n') !== before;
+          if (worktreesChanged) this.watchDocs();
+          // Re-resolving is cheap; re-reading the roadmap is not. Re-read when the
+          // resolved head actually moved, when the worktree set changed (a worktree ref
+          // may have appeared or gone), or when the last read failed and left us empty.
+          const headMoved = await this.resolveHead();
+          if (headMoved || worktreesChanged || !this.parts.roadmap) {
+            const reason = headMoved ? 'roadmap head moved' : worktreesChanged ? 'worktrees changed' : 'roadmap retry';
+            await this.refresh('roadmap', reason);
+          }
           break;
+        }
         case 'roadmap': {
           if (!this.parts.head) await this.resolveHead();
           this.parts.refs = await listRoadmapRefs(this.config, {
@@ -125,8 +144,20 @@ export class RoadmapState extends EventEmitter {
           // a union cannot express a stage a branch DELETED, so it shows work that no
           // longer exists. Default to the newest live version; the UI can pin any other.
           const trunk = this.config.trunk;
-          const ref = this.pinnedRef ?? this.parts.head?.ref ?? trunk;
-          const roadmap = await readRoadmap(this.config, ref);
+          let ref = this.pinnedRef ?? this.parts.head?.ref ?? trunk;
+          let roadmap;
+          try {
+            roadmap = await readRoadmap(this.config, ref);
+          } catch (e) {
+            // A roadmap still being authored may not exist at the trunk at all — only in
+            // a worktree, possibly uncommitted. Fall back to the newest live version
+            // that has it. A pinned ref is the user's explicit choice, so it never falls
+            // back silently.
+            const alt = this.parts.refs.filter((r) => r.ref !== ref && r.kind !== 'history').at(-1);
+            if (this.pinnedRef || !alt) throw e;
+            roadmap = await readRoadmap(this.config, alt.ref);
+            ref = alt.ref;
+          }
           roadmap.ref = ref;
           roadmap.refs = [ref];
 
@@ -196,14 +227,21 @@ export class RoadmapState extends EventEmitter {
     this.timers.push(setInterval(() => this.refresh('github'), this.config.poll?.github ?? 60000));
   }
 
-  /** Watch this roadmap's directory, replacing any previous one. */
+  /**
+   * Watch this roadmap's directory in every working tree that has one, replacing any
+   * previous watchers. The main checkout is not special: a roadmap may exist only in a
+   * worktree, and edits there should show up just as instantly.
+   */
   watchDocs() {
-    this.docsWatcher?.close();
-    this.docsWatcher = null;
-    const docs = path.join(this.config.repo, 'docs/roadmaps', this.config.slug);
-    if (!fs.existsSync(docs)) return;
+    this.docsWatchers.forEach((w) => w.close());
+    this.docsWatchers = [];
+    const roots = new Set([this.config.repo, ...(this.parts.git?.worktrees ?? []).map((w) => w.path)]);
     const onDocs = debounce(() => this.refresh('roadmap', 'roadmap docs'), 300);
-    this.docsWatcher = fs.watch(docs, onDocs);
+    for (const root of roots) {
+      const docs = path.join(root, 'docs/roadmaps', this.config.slug);
+      if (!fs.existsSync(docs)) continue;
+      try { this.docsWatchers.push(fs.watch(docs, onDocs)); } catch { /* a worktree can vanish mid-scan */ }
+    }
   }
 
   /**
@@ -225,6 +263,6 @@ export class RoadmapState extends EventEmitter {
   stop() {
     this.timers.forEach(clearInterval);
     this.watchers.forEach((w) => w.close());
-    this.docsWatcher?.close();
+    this.docsWatchers.forEach((w) => w.close());
   }
 }
